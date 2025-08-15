@@ -17,14 +17,14 @@ ChatMock runs a local server that creates an OpenAI compatible API, and requests
 
 1. Sign in with your ChatGPT account and follow the prompts
 ```bash
-python chatgpt_local.py login
+python chatmock.py login
 ```
-You can make sure this worked by running `python chatgpt_local.py info`
+You can make sure this worked by running `python chatmock.py info`
 
 2. After the login completes successfully, you can just simply start the local server
 
 ```bash
-python chatgpt_local.py serve
+python chatmock.py serve
 ```
 
 - Then, you can simply use the address and port as the baseURL as you require (http://127.0.0.1:8000 by default)
@@ -92,7 +92,7 @@ Models like GPT-5 do not return raw thinking content, but instead return thinkin
 
 ## Notes
 If you wish to have the fastest responses, I'd recommend setting `--reasoning-effort` to low, and `--reasoning-summary` to none.
-All parameters and choices can be seen by sending `python chatgpt_local.py serve --h`
+All parameters and choices can be seen by sending `python chatmock.py serve --h`
 
 **When the model returns a thinking summary, the model will send back thinking tags to make it compatible with chat apps. If you don't like this behavior, you can instead set `--reasoning-compat` to legacy, and reasoning will be set in the reasoning tag instead of being returned in the actual response text.**
 
