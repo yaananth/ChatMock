@@ -93,9 +93,9 @@ Models like GPT-5 do not return raw thinking content, but instead return thinkin
 If you wish to have the fastest responses, I'd recommend setting `--reasoning-effort` to low, and `--reasoning-summary` to none.
 All parameters and choices can be seen by sending `python chatgpt_local.py serve --h`
 
-**When the model returns a thinking summary, the model will send back thinking tags to make it compatiable with chat apps. If you don't like this behavior, you can instead set `--reasoning-compat` to legacy, and reasoning will be set in the reasoning tag instead of being returned in the actual response text.**
+**When the model returns a thinking summary, the model will send back thinking tags to make it compatible with chat apps. If you don't like this behavior, you can instead set `--reasoning-compat` to legacy, and reasoning will be set in the reasoning tag instead of being returned in the actual response text.**
 
-# Todo
+# TODO
 - Implement Ollama support (?)
 - Explore to see if we can make more model settings accessible
 - Implement analytics (token counting, etc, to track usage)
