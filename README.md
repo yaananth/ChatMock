@@ -19,6 +19,7 @@ ChatMock runs a local server that creates an OpenAI compatible API, and requests
 ```bash
 python chatgpt_local.py login
 ```
+You can make sure this worked by running `python chatgpt_local.py info`
 
 2. After the login completes successfully, you can just simply start the local server
 
