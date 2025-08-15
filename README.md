@@ -79,13 +79,15 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 
 # Customisation / Configuration
 
-- Thinking effort
-  GPT-5 has a configurable amount of "effort" it can put into thinking, which may cause it to take more time for a response to return, but may overall give a smarter answer. Applying this parameter after `serve` forces the server to use this reasoning effort by default, unless overrided by the API request with a different effort set. The default reasoning effort without setting this parameter is `medium`.
-  - `--reasoning-effort` (choice of low,medium,high)
+### Thinking effort
 
-- Thinking summaries
-  Models like GPT-5 do not return raw thinking content, but instead return thinking summaries. These can also be customised by you.
-  - `--reasoning-summary` (choice of auto,concise,detailed,none)
+GPT-5 has a configurable amount of "effort" it can put into thinking, which may cause it to take more time for a response to return, but may overall give a smarter answer. Applying this parameter after `serve` forces the server to use this reasoning effort by default, unless overrided by the API request with a different effort set. The default reasoning effort without setting this parameter is `medium`.
+`--reasoning-effort` (choice of low,medium,high)
+
+### Thinking summaries
+
+Models like GPT-5 do not return raw thinking content, but instead return thinking summaries. These can also be customised by you.
+`--reasoning-summary` (choice of auto,concise,detailed,none)
 
 ## Notes
 If you wish to have the fastest responses, I'd recommend setting `--reasoning-effort` to low, and `--reasoning-summary` to none.
