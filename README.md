@@ -13,7 +13,8 @@ ChatMock runs a local server that creates an OpenAI compatible API, and requests
 
 - Clone or download this repository.
 - You need a paid ChatGPT account (Plus/Pro).
-- In the project directory:
+
+In the project directory:
 
 1. Sign in with your ChatGPT account and follow the prompts
 ```bash
