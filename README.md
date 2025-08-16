@@ -12,11 +12,9 @@ This does require a paid ChatGPT account.
 
 ## Quickstart
 
-*If you use MacOS, you can currently try out the GUI application in the Github releases and disregard the below instrunctions*
+*If you use MacOS, you can currently try out the GUI application in the Github releases and disregard the following instructions*
 
-- Clone or download this repository.
-
-In the project directory:
+Clone or download this repository, then cd into the project directory. Then follow the instrunctions listed below.
 
 1. Sign in with your ChatGPT account and follow the prompts
 ```bash
