@@ -30,6 +30,8 @@ python chatmock.py serve
 
 - Then, you can simply use the address and port as the baseURL as you require (http://127.0.0.1:8000 by default)
 
+Reminder: When setting a baseURL, make you sure you include /v1/ at the end of the URL (e.g http://127.0.0.1:8000/v1)
+
 # Examples
 
 ### Python 
