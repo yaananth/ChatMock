@@ -8,12 +8,10 @@
 ## What It Does
 
 ChatMock runs a local server that creates an OpenAI compatible API, and requests are then fulfilled using your authenticated ChatGPT login with the oauth client of Codex, OpenAI's coding CLI tool. This allows you to use GPT-5 and other models right through your OpenAI account, without requiring an api key.
+This does require a paid ChatGPT account.
 
 ## Quickstart
 
-- You need a paid ChatGPT account (Plus/Pro).
-
-#### Note: 
 *If you use MacOS, you can currently try out the GUI application in the Github releases and disregard the below instrunctions*
 
 - Clone or download this repository.
