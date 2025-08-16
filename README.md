@@ -72,7 +72,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 
 - Requires an active, paid ChatGPT account.
 - Expect lower rate limits than what you may recieve in the ChatGPT app.
-- Must use the instrunctions given in the prompt.md, instrunctions in the system prompt cannot be modified.
+- Instrunctions in the system prompt (prompt.md) cannot be modified
 - Use responsibly and at your own risk. This project is not affiliated with OpenAI, and is a educational exercise.
 
 # Supported models
