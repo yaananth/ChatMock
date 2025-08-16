@@ -13,7 +13,8 @@ ChatMock runs a local server that creates an OpenAI compatible API, and requests
 
 - You need a paid ChatGPT account (Plus/Pro).
 
-### Note: *If you use MacOS, you can currently try out the GUI application in the Github releases and disregard the below instrunctions*
+#### Note: 
+*If you use MacOS, you can currently try out the GUI application in the Github releases and disregard the below instrunctions*
 
 - Clone or download this repository.
 
