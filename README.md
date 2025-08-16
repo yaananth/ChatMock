@@ -94,6 +94,7 @@ Models like GPT-5 do not return raw thinking content, but instead return thinkin
 ## Notes
 If you wish to have the fastest responses, I'd recommend setting `--reasoning-effort` to low, and `--reasoning-summary` to none.
 All parameters and choices can be seen by sending `python chatmock.py serve --h`
+The context size of this route is also larger than what you get access to in the regular ChatGPT app.
 
 **When the model returns a thinking summary, the model will send back thinking tags to make it compatible with chat apps. If you don't like this behavior, you can instead set `--reasoning-compat` to legacy, and reasoning will be set in the reasoning tag instead of being returned in the actual response text.**
 
