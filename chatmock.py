@@ -117,26 +117,69 @@ def create_app(
     def _convert_ollama_messages(messages: List[Dict[str, Any]] | None, top_images: List[str] | None) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
         msgs = messages if isinstance(messages, list) else []
+        pending_call_ids: List[str] = []
+        call_counter = 0
         for m in msgs:
             if not isinstance(m, dict):
                 continue
             role = m.get("role") or "user"
+            nm: Dict[str, Any] = {"role": role}
+
             content = m.get("content")
             images = m.get("images") if isinstance(m.get("images"), list) else []
-            parts = []
+            parts: List[Dict[str, Any]] = []
             if isinstance(content, list):
                 for p in content:
                     if isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str):
                         parts.append({"type": "text", "text": p.get("text")})
-            elif isinstance(content, str) and content.strip():
+            elif isinstance(content, str):
                 parts.append({"type": "text", "text": content})
             for img in images:
                 url = _to_data_url(img)
                 if isinstance(url, str) and url:
                     parts.append({"type": "image_url", "image_url": {"url": url}})
-            if not parts:
-                parts.append({"type": "text", "text": ""})
-            out.append({"role": role, "content": parts})
+            if parts:
+                nm["content"] = parts
+
+            if role == "assistant" and isinstance(m.get("tool_calls"), list):
+                tcs = []
+                for tc in m.get("tool_calls"):
+                    if not isinstance(tc, dict):
+                        continue
+                    fn = tc.get("function") if isinstance(tc.get("function"), dict) else {}
+                    name = fn.get("name") if isinstance(fn.get("name"), str) else None
+                    args = fn.get("arguments")
+                    if name is None:
+                        continue
+                    call_id = tc.get("id") or tc.get("call_id")
+                    if not isinstance(call_id, str) or not call_id:
+                        call_counter += 1
+                        call_id = f"ollama_call_{call_counter}"
+                    pending_call_ids.append(call_id)
+                    tcs.append({
+                        "id": call_id,
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "arguments": args if isinstance(args, str) else (json.dumps(args) if isinstance(args, dict) else "{}"),
+                        },
+                    })
+                if tcs:
+                    nm["tool_calls"] = tcs
+
+            if role == "tool":
+                tci = m.get("tool_call_id") or m.get("id")
+                if not isinstance(tci, str) or not tci:
+                    if pending_call_ids:
+                        tci = pending_call_ids.pop(0)
+                if isinstance(tci, str) and tci:
+                    nm["tool_call_id"] = tci
+
+                if not parts and isinstance(content, str):
+                    nm["content"] = content
+
+            out.append(nm)
+
         if isinstance(top_images, list) and top_images:
             attach_to = None
             for i in range(len(out) - 1, -1, -1):
@@ -146,10 +189,44 @@ def create_app(
             if attach_to is None:
                 attach_to = {"role": "user", "content": []}
                 out.append(attach_to)
+            attach_to.setdefault("content", [])
             for img in top_images:
                 url = _to_data_url(img)
                 if isinstance(url, str) and url:
                     attach_to["content"].append({"type": "image_url", "image_url": {"url": url}})
+        return out
+
+    def _normalize_ollama_tools(tools: List[Dict[str, Any]] | None) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        if not isinstance(tools, list):
+            return out
+        for t in tools:
+            if not isinstance(t, dict):
+                continue
+            if isinstance(t.get("function"), dict):
+                fn = t.get("function")
+                name = fn.get("name") if isinstance(fn.get("name"), str) else None
+                if not name:
+                    continue
+                out.append({
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "description": fn.get("description") or "",
+                        "parameters": fn.get("parameters") if isinstance(fn.get("parameters"), dict) else {"type": "object", "properties": {}},
+                    },
+                })
+                continue
+            name = t.get("name") if isinstance(t.get("name"), str) else None
+            if name:
+                out.append({
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "description": t.get("description") or "",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                })
         return out
 
     @app.route("/v1/chat/completions", methods=["POST", "OPTIONS"])
@@ -392,6 +469,8 @@ def create_app(
             for k, v in build_cors_headers().items():
                 resp.headers[k] = v
             return resp
+        if verbose:
+            vlog("IN GET /api/tags")
         model_id = "gpt-5"
         models = [{
             "name": model_id,
@@ -421,6 +500,12 @@ def create_app(
                 resp.headers[k] = v
             return resp
         try:
+            if verbose:
+                body_preview = (request.get_data(cache=True, as_text=True) or "")[:2000]
+                vlog("IN POST /api/show\n" + body_preview)
+        except Exception:
+            pass
+        try:
             payload = request.get_json(silent=True) or {}
         except Exception:
             payload = {}
@@ -444,7 +529,7 @@ def create_app(
                 "general.file_type": 2,
                 "llama.context_length": 2000000,
             },
-            "capabilities": ["completion", "vision"],
+            "capabilities": ["completion", "vision", "tools", "thinking"],
         }
         resp = make_response(jsonify(v1_show_response), 200)
         for k, v in build_cors_headers().items():
@@ -461,6 +546,8 @@ def create_app(
 
         try:
             raw = request.get_data(cache=True, as_text=True) or ""
+            if verbose:
+                vlog("IN POST /api/chat\n" + (raw[:2000] if isinstance(raw, str) else ""))
             payload = json.loads(raw) if raw else {}
         except Exception:
             return jsonify({"error": "Invalid JSON body"}), 400
@@ -472,6 +559,10 @@ def create_app(
         if stream_req is None:
             stream_req = True
         stream_req = bool(stream_req)
+        tools_req = payload.get("tools") if isinstance(payload.get("tools"), list) else []
+        tools_responses = convert_tools_chat_to_responses(_normalize_ollama_tools(tools_req))
+        tool_choice = payload.get("tool_choice", "auto")
+        parallel_tool_calls = bool(payload.get("parallel_tool_calls", False))
 
         if not isinstance(model, str) or not isinstance(messages, list) or not messages:
             return jsonify({"error": "Invalid request format"}), 400
@@ -482,9 +573,9 @@ def create_app(
             _normalize_model_name(model),
             input_items,
             instructions=BASE_INSTRUCTIONS,
-            tools=[],
-            tool_choice="auto",
-            parallel_tool_calls=False,
+            tools=tools_responses,
+            tool_choice=tool_choice,
+            parallel_tool_calls=parallel_tool_calls,
             reasoning_param=_build_reasoning_param(None),
         )
         if error_resp is not None:
@@ -495,6 +586,8 @@ def create_app(
                 err_body = json.loads(upstream.content.decode("utf-8", errors="ignore")) if upstream.content else {"raw": upstream.text}
             except Exception:
                 err_body = {"raw": upstream.text}
+            if verbose:
+                vlog("/api/chat upstream error status=", upstream.status_code, " body:", json.dumps(err_body)[:2000])
             return (
                 jsonify({"error": (err_body.get("error", {}) or {}).get("message", "Upstream error")}),
                 upstream.status_code,
@@ -514,6 +607,8 @@ def create_app(
                         if not raw_line:
                             continue
                         line = raw_line.decode("utf-8", errors="ignore") if isinstance(raw_line, (bytes, bytearray)) else raw_line
+                        if verbose and vlog:
+                            vlog(line)
                         if not line.startswith("data: "):
                             continue
                         data = line[len("data: "):].strip()
@@ -585,6 +680,39 @@ def create_app(
                                 "done": False,
                             }
                             yield json.dumps(out, ensure_ascii=False) + "\n\n"
+                        elif kind == "response.output_item.done":
+                            item = evt.get("item") or {}
+                            if isinstance(item, dict) and item.get("type") == "function_call":
+                                if compat == "think-tags" and think_open and not think_closed:
+                                    outc = {
+                                        "model": _normalize_model_name(model),
+                                        "created_at": created_at,
+                                        "message": {"role": "assistant", "content": "</think>"},
+                                        "done": False,
+                                    }
+                                    yield json.dumps(outc, ensure_ascii=False) + "\n\n"
+                                    think_open = False
+                                    think_closed = True
+                                name = item.get("name") or ""
+                                args = item.get("arguments") or ""
+                                try:
+                                    parsed_args = json.loads(args) if isinstance(args, str) else (args or {})
+                                except Exception:
+                                    parsed_args = args
+                                cid = item.get("call_id") or item.get("id")
+                                out = {
+                                    "model": _normalize_model_name(model),
+                                    "created_at": created_at,
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": "",
+                                        "tool_calls": [
+                                            {"id": cid, "function": {"name": name, "arguments": parsed_args}}
+                                        ],
+                                    },
+                                    "done": False,
+                                }
+                                yield json.dumps(out, ensure_ascii=False) + "\n\n"
                         elif kind == "response.completed":
                             break
                 finally:
@@ -617,11 +745,14 @@ def create_app(
         full_text = ""
         reasoning_summary_text = ""
         reasoning_full_text = ""
+        tool_calls: List[Dict[str, Any]] = []
         try:
             for raw_line in upstream.iter_lines(decode_unicode=False):
                 if not raw_line:
                     continue
                 line = raw_line.decode("utf-8", errors="ignore") if isinstance(raw_line, (bytes, bytearray)) else raw_line
+                if verbose and vlog:
+                    vlog(line)
                 if not line.startswith("data: "):
                     continue
                 data = line[len("data: "):].strip()
@@ -636,6 +767,17 @@ def create_app(
                 kind = evt.get("type")
                 if kind == "response.output_text.delta":
                     full_text += evt.get("delta") or ""
+                elif kind == "response.output_item.done":
+                    item = evt.get("item") or {}
+                    if isinstance(item, dict) and item.get("type") == "function_call":
+                        name = item.get("name") or ""
+                        args = item.get("arguments") or ""
+                        try:
+                            parsed_args = json.loads(args) if isinstance(args, str) else (args or {})
+                        except Exception:
+                            parsed_args = args
+                        cid = item.get("call_id") or item.get("id")
+                        tool_calls.append({"id": cid, "function": {"name": name, "arguments": parsed_args}})
                 elif kind == "response.reasoning_summary_text.delta":
                     reasoning_summary_text += evt.get("delta") or ""
                 elif kind == "response.reasoning_text.delta":
@@ -657,7 +799,7 @@ def create_app(
         out_json = {
             "model": _normalize_model_name(model),
             "created_at": created_at,
-            "message": {"role": "assistant", "content": full_text},
+            "message": {"role": "assistant", "content": full_text, **({"tool_calls": tool_calls} if tool_calls else {})},
             "done": True,
             "done_reason": "stop",
         }
