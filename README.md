@@ -1,6 +1,5 @@
 <div align="center">
   <h1>ChatMock</h1>
-  <img src = "icon.png" width = 200 height = 200>
   <p><b>OpenAI & Ollama compatible API powered by your ChatGPT plan.</b></p>
   <p>Use your ChatGPT Plus/Pro account to call OpenAI models from code or alternate chat UIs.</p>
   <br>
