@@ -13,7 +13,7 @@ This does require a paid ChatGPT account.
 ## Quickstart
 
 ### Mac Users
-If you use MacOS, you can use the GUI application in the Github releases. Unfortunately, you will have to type this command also in the terminal on Mac to ensure you can run the application: <br>
+If you use MacOS, you can use the GUI application in the Github releases. Unfortunately, due to not being part of the paid apple developer program, you will have to click "Open anyway" in security after trying to right click and open the app. If that doesn't work you will have to type this command in the terminal on Mac to ensure you can run the application: <br>
 `xattr -dr com.apple.quarantine /Applications/ChatMock.app*`<br>
 *See more info [here](https://github.com/deskflow/deskflow/wiki/Running-on-macOS)*
 
