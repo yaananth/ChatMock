@@ -1,13 +1,13 @@
 <div align="center">
   <h1>ChatMock</h1>
-  <p><b>OpenAI compatible API powered by your ChatGPT plan.</b></p>
+  <p><b>OpenAI & Ollama compatible API powered by your ChatGPT plan.</b></p>
   <p>Use your ChatGPT Plus/Pro account to call OpenAI models from code or alternate chat UIs.</p>
   <br>
 </div>
 
 ## What It Does
 
-ChatMock runs a local server that creates an OpenAI compatible API, and requests are then fulfilled using your authenticated ChatGPT login with the oauth client of Codex, OpenAI's coding CLI tool. This allows you to use GPT-5 and other models right through your OpenAI account, without requiring an api key.
+ChatMock runs a local server that creates an OpenAI/Ollama compatible API, and requests are then fulfilled using your authenticated ChatGPT login with the oauth client of Codex, OpenAI's coding CLI tool. This allows you to use GPT-5 and other models right through your OpenAI account, without requiring an api key.
 This does require a paid ChatGPT account.
 
 ## Quickstart
@@ -29,7 +29,7 @@ python chatmock.py serve
 ```
 Then, you can simply use the address and port as the baseURL as you require (http://127.0.0.1:8000 by default)
 
-**Reminder:** When setting a baseURL, make you sure you include /v1/ at the end of the URL (e.g http://127.0.0.1:8000/v1)
+**Reminder:** When setting a baseURL, make you sure you include /v1/ at the end of the URL if you're using this as a OpenAI compatible endpoint (e.g http://127.0.0.1:8000/v1)
 
 # Examples
 
@@ -100,6 +100,6 @@ The context size of this route is also larger than what you get access to in the
 **When the model returns a thinking summary, the model will send back thinking tags to make it compatible with chat apps. If you don't like this behavior, you can instead set `--reasoning-compat` to legacy, and reasoning will be set in the reasoning tag instead of being returned in the actual response text.**
 
 # TODO
-- Implement Ollama support (?)
+- ~~Implement Ollama support~~ ✅
 - Explore to see if we can make more model settings accessible
 - Implement analytics (token counting, etc, to track usage)
