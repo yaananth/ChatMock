@@ -113,5 +113,7 @@ The context size of this route is also larger than what you get access to in the
 - Explore to see if we can make more model settings accessible
 - Implement analytics (token counting, etc, to track usage)
 
-<iframe style="width:100%;height:auto;min-width:600px;min-height:400px;" src="https://www.star-history.com/embed?secret=Z2hwX3M4VkhIakg2MDBFMmFkNUoxRVlZVnFBMGhtU3p0dDJ6ckZ2dw==#RayBytes/ChatMock&Timeline" frameBorder="0"></iframe>
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=RayBytes/ChatMock&type=Timeline)](https://www.star-history.com/#RayBytes/ChatMock&Timeline)
 
