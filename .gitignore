@@ -19,3 +19,36 @@ dist/
 
 # OS clutter
 .DS_Store
+
+# IDE files
+ChatMock.code-workspace
+RESUME_CHAT.bat
+.gitignore
+scripts/debug_responses.py
+scripts/debug_responses.ps1
+.claude/settings.local.json
+.vscode/
+.idea/
+
+# Runtime files
+*.pid
+*.log
+*.access.log
+*.error.log
+gunicorn*.log
+chatmock.log
+chatmock.access.log
+chatmock.error.log
+chatmock.pid
+responses_debug.jsonl
+
+# Local prompt cache (fetched from GitHub)
+.chatmock/
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# Auth tokens (sensitive)
+auth.json

@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from flask import Blueprint, Response, current_app, jsonify, make_response, request
 
 from .config import BASE_INSTRUCTIONS, GPT5_CODEX_INSTRUCTIONS
+from .prompts import mark_prompt_invalid
 from .limits import record_rate_limits_from_response
 from .http import build_cors_headers
 from .reasoning import apply_reasoning_to_message, build_reasoning_param, extract_reasoning_from_model_name
@@ -39,6 +40,23 @@ def chat_completions() -> Response:
     reasoning_compat = current_app.config.get("REASONING_COMPAT", "think-tags")
     debug_model = current_app.config.get("DEBUG_MODEL")
 
+    # Log request summary for debugging
+    try:
+        import sys
+        raw = request.get_data(cache=True, as_text=True) or ""
+        payload = json.loads(raw) if raw else {}
+        req_summary = {
+            "route": "/v1/chat/completions",
+            "model": payload.get("model"),
+            "stream": payload.get("stream"),
+            "has_tools": "tools" in payload,
+            "has_responses_tools": "responses_tools" in payload,
+            "user_agent": request.headers.get("User-Agent", "unknown")[:50],
+        }
+        print(f"[CHAT] Request: {json.dumps(req_summary)}", file=sys.stderr)
+    except Exception:
+        pass
+
     if verbose:
         try:
             body_preview = (request.get_data(cache=True, as_text=True) or "")[:2000]
@@ -57,6 +75,8 @@ def chat_completions() -> Response:
 
     requested_model = payload.get("model")
     model = normalize_model_name(requested_model, debug_model)
+    prompt_key = "gpt5_codex_instructions" if model == "gpt-5-codex" else "base_instructions"
+    instructions_text = _instructions_for_model(model)
     messages = payload.get("messages")
     if messages is None and isinstance(payload.get("prompt"), str):
         messages = [{"role": "user", "content": payload.get("prompt") or ""}]
@@ -135,7 +155,7 @@ def chat_completions() -> Response:
     upstream, error_resp = start_upstream_request(
         model,
         input_items,
-        instructions=_instructions_for_model(model),
+        instructions=instructions_text,
         tools=tools_responses,
         tool_choice=tool_choice,
         parallel_tool_calls=parallel_tool_calls,
@@ -153,6 +173,37 @@ def chat_completions() -> Response:
             err_body = json.loads(raw.decode("utf-8", errors="ignore")) if raw else {"raw": upstream.text}
         except Exception:
             err_body = {"raw": upstream.text}
+        error_dict = err_body.get("error") if isinstance(err_body, dict) else None
+        message = None
+        code = None
+        err_type = None
+        if isinstance(error_dict, dict):
+            message = error_dict.get("message")
+            code = error_dict.get("code")
+            err_type = error_dict.get("type")
+        if not message and isinstance(err_body, dict):
+            message = err_body.get("detail") or err_body.get("message")
+        message = message or "Upstream error"
+        payload_error = {"message": message}
+        if code:
+            payload_error["code"] = code
+        if err_type:
+            payload_error["type"] = err_type
+        if isinstance(err_body, dict) and isinstance(err_body.get("detail"), str) and err_body.get("detail") != message:
+            payload_error["detail"] = err_body.get("detail")
+        if isinstance(err_body, dict) and isinstance(err_body.get("raw"), str):
+            payload_error["raw"] = err_body.get("raw")
+        try:
+            import sys
+            print(
+                f"[UPSTREAM_ERROR] route=/v1/chat/completions status={upstream.status_code} message={message}",
+                file=sys.stderr,
+            )
+        except Exception:
+            pass
+        failure_hint = message or payload_error.get("detail")
+        if instructions_text and isinstance(failure_hint, str) and "instruction" in failure_hint.lower():
+            mark_prompt_invalid(prompt_key, instructions_text, failure_hint)
         if had_responses_tools:
             if verbose:
                 print("[Passthrough] Upstream rejected tools; retrying without extra tools (args redacted)")
@@ -171,24 +222,12 @@ def chat_completions() -> Response:
             if err2 is None and upstream2 is not None and upstream2.status_code < 400:
                 upstream = upstream2
             else:
-                return (
-                    jsonify(
-                        {
-                            "error": {
-                                "message": (err_body.get("error", {}) or {}).get("message", "Upstream error"),
-                                "code": "RESPONSES_TOOLS_REJECTED",
-                            }
-                        }
-                    ),
-                    (upstream2.status_code if upstream2 is not None else upstream.status_code),
-                )
+                payload_error.setdefault("code", "RESPONSES_TOOLS_REJECTED")
+                return jsonify({"error": payload_error}), (upstream2.status_code if upstream2 is not None else upstream.status_code)
         else:
             if verbose:
                 print("Upstream error status=", upstream.status_code)
-            return (
-                jsonify({"error": {"message": (err_body.get("error", {}) or {}).get("message", "Upstream error")}}),
-                upstream.status_code,
-            )
+            return jsonify({"error": payload_error}), upstream.status_code
 
     if is_stream:
         resp = Response(
@@ -354,6 +393,22 @@ def completions() -> Response:
             err_body = json.loads(upstream.content.decode("utf-8", errors="ignore")) if upstream.content else {"raw": upstream.text}
         except Exception:
             err_body = {"raw": upstream.text}
+        
+        # Log the upstream error with details - write to stderr so it appears in logs
+        try:
+            import logging
+            logging.basicConfig()
+            logger = logging.getLogger(__name__)
+            error_msg = {
+                "status": upstream.status_code,
+                "error": err_body,
+                "model": model,
+                "user_agent": request.headers.get("User-Agent", "unknown")[:50],
+            }
+            # Use print to stderr to ensure it gets to error log
+            print(f"[UPSTREAM_ERROR] {json.dumps(error_msg)}", file=sys.stderr, flush=True)
+        except Exception:
+            pass
         return (
             jsonify({"error": {"message": (err_body.get("error", {}) or {}).get("message", "Upstream error")}}),
             upstream.status_code,

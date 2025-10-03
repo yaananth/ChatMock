@@ -1,0 +1,3 @@
+#!/bin/bash
+# Tail access logs
+exec tail -f "$(dirname "$0")/../chatmock.access.log" 2>/dev/null || echo "Access log not found"

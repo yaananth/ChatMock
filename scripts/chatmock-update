@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""
+ChatMock update script with conflict detection and resolution support.
+"""
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+# ANSI colors
+RED = '\033[0;31m'
+GREEN = '\033[0;32m'
+YELLOW = '\033[1;33m'
+BLUE = '\033[0;36m'  # Cyan
+NC = '\033[0m'
+
+CHATMOCK_DIR = Path.home() / "dev" / "yaananth" / "ChatMock"
+
+
+def colored(text: str, color: str) -> str:
+    return f"{color}{text}{NC}"
+
+
+def run_command(cmd: list[str], capture=False):
+    """Run command with error handling."""
+    try:
+        if capture:
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=CHATMOCK_DIR)
+            return result
+        else:
+            subprocess.run(cmd, cwd=CHATMOCK_DIR, check=True)
+            return None
+    except subprocess.CalledProcessError as e:
+        return e if capture else None
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Update ChatMock from origin/main")
+    parser.add_argument('--no-stash', action='store_true', help="Don't stash changes")
+    args = parser.parse_args()
+    
+    print(colored("=== ChatMock Update ===", BLUE))
+    print()
+    
+    # Check for uncommitted changes
+    result = run_command(['git', 'diff-index', '--quiet', 'HEAD', '--'], capture=True)
+    has_changes = result.returncode != 0
+    
+    stashed = False
+    if has_changes and not args.no_stash:
+        print(colored("Uncommitted changes detected:", YELLOW))
+        run_command(['git', 'status', '--short'])
+        print()
+        print(colored("Stashing changes...", YELLOW))
+        run_command(['git', 'stash', 'push', '-m', f'chatmock-update-{subprocess.check_output(["date", "+%Y%m%d_%H%M%S"], text=True).strip()}'])
+        stashed = True
+        print(colored("✓ Changes stashed", GREEN))
+        print()
+    
+    # Fetch from origin
+    print(colored("Fetching from origin/main...", BLUE))
+    result = run_command(['git', 'fetch', 'origin', 'main'], capture=True)
+    if result.returncode != 0:
+        print(colored("✗ Failed to fetch from origin", RED))
+        if stashed:
+            print(colored("Restoring stashed changes...", YELLOW))
+            run_command(['git', 'stash', 'pop'])
+        sys.exit(1)
+    
+    # Check if up to date
+    local = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=CHATMOCK_DIR, text=True).strip()
+    remote = subprocess.check_output(['git', 'rev-parse', 'origin/main'], cwd=CHATMOCK_DIR, text=True).strip()
+    
+    if local == remote:
+        print(colored("✓ Already up to date with origin/main", GREEN))
+        if stashed:
+            print(colored("Restoring stashed changes...", YELLOW))
+            run_command(['git', 'stash', 'pop'])
+        sys.exit(0)
+    
+    # Restore stash before merge
+    if stashed:
+        print(colored("Restoring stashed changes...", YELLOW))
+        run_command(['git', 'stash', 'pop'])
+        print()
+    
+    # Try to merge
+    print(colored("Attempting to merge origin/main...", BLUE))
+    result = run_command(['git', 'merge', 'origin/main', '--no-edit'], capture=True)
+    
+    if result.returncode == 0:
+        print(colored("✓ Successfully merged origin/main", GREEN))
+        print()
+        print(colored("Updating dependencies...", BLUE))
+        run_command(['pip3', 'install', '-r', 'requirements.txt', '-q'])
+        print(colored("✓ Dependencies updated", GREEN))
+        print()
+        print(colored("ChatMock updated successfully!", GREEN))
+        sys.exit(0)
+    
+    # Merge failed - conflicts
+    print()
+    print(colored("╔════════════════════════════════════════════════╗", RED))
+    print(colored("║         MERGE CONFLICTS DETECTED              ║", RED))
+    print(colored("╚════════════════════════════════════════════════╝", RED))
+    print()
+    
+    # Show conflicted files
+    result = run_command(['git', 'diff', '--name-only', '--diff-filter=U'], capture=True)
+    if result.stdout:
+        print(colored("Conflicted files:", YELLOW))
+        for file in result.stdout.strip().split('\n'):
+            if file:
+                print(f"  {colored('✗', RED)} {file}")
+        print()
+    
+    print(colored("Use 'copilot' to resolve conflicts, then:", YELLOW))
+    print(f"  {colored('git add <resolved-files>', GREEN)}")
+    print(f"  {colored('git commit', GREEN)}")
+    print()
+    print(f"{colored('Or to abort:', BLUE)} {colored('git merge --abort', YELLOW)}")
+    
+    sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

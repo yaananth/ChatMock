@@ -1,0 +1,3 @@
+#!/bin/bash
+# Tail error logs
+exec tail -f "$(dirname "$0")/../chatmock.error.log" 2>/dev/null || echo "Error log not found"
